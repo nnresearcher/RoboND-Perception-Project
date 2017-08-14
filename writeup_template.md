@@ -64,5 +64,6 @@ And here's another image!
 
 Spend some time at the end to discuss your code, what techniques you used, what worked and why, where the implementation might fail and how you might improve it if you were going to pursue this project further.  
 
-
+# Extract features and train an SVM model on new objects
+Use the model that has been created in practice three
 
