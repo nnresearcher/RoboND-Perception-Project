@@ -64,6 +64,109 @@ And here's another image!
 
 Spend some time at the end to discuss your code, what techniques you used, what worked and why, where the implementation might fail and how you might improve it if you were going to pursue this project further.  
 
-# Extract features and train an SVM model on new objects
-Use the model that has been created in practice three
+## 1. Extract features and train an SVM model on new objects
 
+Use the model that has been created in practice three. The diagram below model accuracy
+
+![model_2](https://github.com/nnresearcher/RoboND-Perception-Project/blob/master/pr2_robot/pic/figure_1.png)
+
+## 2. Write a ROS node and subscribe to `/pr2/world/points` topic
+
+  We write some node as these:
+`
+    rospy.init_node('clustering', anonymous=True)
+    
+    pcl_sub = rospy.Subscriber("/pr2/world/points", pc2.PointCloud2, pcl_callback, queue_size=1)
+    
+    pcl_objects_pub = rospy.Publisher("/pcl_objects", PointCloud2, queue_size=1)
+    
+    pcl_table_pub = rospy.Publisher("/pcl_table", PointCloud2, queue_size=1)
+    
+    pcl_cluster_pub = rospy.Publisher("pcl_cluster", PointCloud2, queue_size=1)
+    
+    object_markers_pub = rospy.Publisher("/object_markers", Marker, queue_size=1)
+    
+    detected_objects_pub = rospy.Publisher("/detected_objects", DetectedObjectsArray, queue_size=1)
+    
+    base_controller_pub = rospy.Publisher("/pr2/world_joint_controller/command", Float64, queue_size=1)
+    
+`
+
+The ROS node `pcl_sub` is subscribe to `/pr2/world/points` topic.
+
+## 3. Use filtering and RANSAC plane fitting to isolate the objects 
+
+  Just as we do in exercise 2, we creat 'Voxel Grid Downsampling'、'PassThrough Filter'、'Previous filters'、'RANSAC Plane Segmentation' to isolate the objects.
+
+  The code is too long is not listed.
+
+## 4. Apply Euclidean clustering to create separate clusters
+   
+    white_cloud = XYZRGB_to_XYZ(cloud_objects)# Apply function to convert XYZRGB to XYZ
+    tree = white_cloud.make_kdtree()
+    ec = white_cloud.make_EuclideanClusterExtraction()
+    ec.set_ClusterTolerance(0.01)
+    ec.set_MinClusterSize(20)
+    ec.set_MaxClusterSize(3000)
+    ec.set_SearchMethod(tree)
+    cluster_indices = ec.Extract()
+    
+    
+## 5. Perform object recognition on these objects and assign them labels (markers in RViz).
+
+  We can see in the cognitive result of three scenarios
+  
+  In the first scenarios
+  
+  ![test1.world](https://github.com/nnresearcher/RoboND-Perception-Project/blob/master/pr2_robot/pic/1.png)
+  
+  My code recognize all objects to success in test1.world
+  
+  In the second scenarios
+  
+  ![test2.world](https://github.com/nnresearcher/RoboND-Perception-Project/blob/master/pr2_robot/pic/2.png)
+  
+  My code recognize all objects to success in test2.world
+  
+  In the third scenarios
+  
+  ![test3.world](https://github.com/nnresearcher/RoboND-Perception-Project/blob/master/pr2_robot/pic/3.png)
+  
+  My code recognize 7/8 objects to success in test3.world
+  
+## 6. Calculate the centroid
+
+        points_arr = ros_to_pcl(object.cloud).to_array()
+        object_centroid = np.mean(points_arr, axis=0)[:3]
+        centroids.append(object_centroid)
+        PICK_POSE.position.x = float(object_centroid[0])
+        PICK_POSE.position.y = float(object_centroid[1])
+        PICK_POSE.position.z = float(object_centroid[2])
+        
+  PICK_POSE.position.x 、PICK_POSE.position.y and PICK_POSE.position.z is object centroid
+  
+## 7. Create ROS messages containing the details
+
+    TEST_SCENE_NUM  = Int32()
+    TEST_SCENE_NUM.data = 3
+    PICK_POSE = Pose()
+    PLACE_POSE = Pose()
+    WHICH_ARM = String()
+    for i in range(len(dropbox_list)):
+        for k  in range(len(object_list_param)):
+            if object.label == object_list_param[k]['name']:
+                if object_list_param[k]['group'] == dropbox_list[i]['group']:
+                    PLACE_POSE.position.x = dropbox_list[i]['position'][0]
+                    PLACE_POSE.position.y = dropbox_list[i]['position'][1]
+                    PLACE_POSE.position.z = dropbox_list[i]['position'][2]
+                    WHICH_ARM.data = str(dropbox_list[i]['name'])
+    yaml_dict = make_yaml_dict(TEST_SCENE_NUM, WHICH_ARM, OBJECT_NAME, PICK_POSE, PLACE_POSE)
+## 8. Write these messages
+
+  Using the code 
+  
+      send_to_yaml('output_list_3.yaml', dict_list)
+   
+  I save the .yaml in https://github.com/nnresearcher/RoboND-Perception-Project
+  
+## That is all 
