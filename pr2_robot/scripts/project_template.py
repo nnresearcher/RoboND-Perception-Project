@@ -60,7 +60,7 @@ def pcl_callback(pcl_msg):
     cloud_filtered = vox.filter()
 
     # TODO: PassThrough Filter
-    # z
+
     passthrough = cloud_filtered.make_passthrough_filter()
     filter_axis = 'z'
     passthrough.set_filter_field_name (filter_axis)
@@ -68,14 +68,7 @@ def pcl_callback(pcl_msg):
     axis_max = 0.8
     passthrough.set_filter_limits (axis_min, axis_max)
     cloud_filtered = passthrough.filter()
-    # x
-    #passthrough = cloud_filtered.make_passthrough_filter()
-    #filter_axis = 'y'
-    #passthrough.set_filter_field_name (filter_axis)
-    #axis_min = -0.5
-    #axis_max = 0.5
-    #passthrough.set_filter_limits (axis_min, axis_max)
-    #cloud_filtered = passthrough.filter()
+
     
     passthrough = cloud_filtered.make_passthrough_filter()
     filter_axis = 'x'
@@ -108,8 +101,8 @@ def pcl_callback(pcl_msg):
     white_cloud = XYZRGB_to_XYZ(cloud_objects)# Apply function to convert XYZRGB to XYZ
     tree = white_cloud.make_kdtree()
     ec = white_cloud.make_EuclideanClusterExtraction()
-    ec.set_ClusterTolerance(0.007)
-    ec.set_MinClusterSize(30)
+    ec.set_ClusterTolerance(0.01)
+    ec.set_MinClusterSize(20)
     ec.set_MaxClusterSize(3000)
     ec.set_SearchMethod(tree)
     cluster_indices = ec.Extract()
@@ -191,65 +184,61 @@ def pcl_callback(pcl_msg):
 def pr2_mover(object_list):
 
     # TODO: Initialize variables
-
+    TEST_SCENE_NUM  = Int32()
+    TEST_SCENE_NUM.data = 3
+    PICK_POSE = Pose()
+    PLACE_POSE = Pose()
+    WHICH_ARM = String()
     # TODO: Get/Read parameters
     object_list_param = rospy.get_param('/object_list')
-    #print ('object_list_param:',object_list_param)
     dropbox_list = rospy.get_param('/dropbox')
-    #print ('dropbox_list:',dropbox_list)
+
     # TODO: Parse parameters into individual variables
-    TEST_SCENE_NUM  = Int32()
-    TEST_SCENE_NUM.data = 1
-    for i in object_list_param:#####sort object_list as param /object_list set
+    #sort object_list
+    for i in object_list_param:
         for k in range(len(object_list)):
            if i['name'] == object_list[k].label:
                object_list += [object_list.pop(k)]
                
                
     # TODO: Rotate PR2 in place to capture side tables for the collision map
-    #base_controller_pub.publish(Float64(1.57))
-    #rospy.sleep(10.)
-    #base_controller_pub.publish(Float64(-1.57))
-    #rospy.sleep(20.)
+    base_controller_pub.publish(Float64(1.57))
+    rospy.sleep(10.)
+    base_controller_pub.publish(Float64(-1.57))
+    rospy.sleep(20.)
     base_controller_pub.publish(Float64(0))
-    rospy.sleep(2.)
+    rospy.sleep(20.)
     # TODO: Loop through the pick list
 
-    # TODO: Get the PointCloud for a given object and obtain it's centroid
     dict_list = []
     labels = []
     centroids = [] # to be list of tuples (x, y, z)
+
     for object in object_list:
         labels.append(object.label)
         points_arr = ros_to_pcl(object.cloud).to_array()
+    	# TODO: Get the PointCloud for a given object and obtain it's centroid
         object_centroid = np.mean(points_arr, axis=0)[:3]
         centroids.append(object_centroid)
-
         OBJECT_NAME = String()
         OBJECT_NAME.data = str(object.label)  
-        
-        PICK_POSE = Pose()
+        # TODO: Assign the arm to be used for pick_place
         PICK_POSE.position.x = float(object_centroid[0])
         PICK_POSE.position.y = float(object_centroid[1])
         PICK_POSE.position.z = float(object_centroid[2])
 
-        PLACE_POSE = Pose()
-        WHICH_ARM = String()
         for i in range(len(dropbox_list)):
             for k  in range(len(object_list_param)):
                 if object.label == object_list_param[k]['name']:
-                    if object_list_param[k]['group'] == dropbox_list[i]['group']:	
+                    if object_list_param[k]['group'] == dropbox_list[i]['group']:
+        		# TODO: Create 'place_pose' for the object	
                         PLACE_POSE.position.x = dropbox_list[i]['position'][0]
                         PLACE_POSE.position.y = dropbox_list[i]['position'][1]
                         PLACE_POSE.position.z = dropbox_list[i]['position'][2]
                         WHICH_ARM.data = str(dropbox_list[i]['name'])
+        # TODO: Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
         yaml_dict = make_yaml_dict(TEST_SCENE_NUM, WHICH_ARM, OBJECT_NAME, PICK_POSE, PLACE_POSE)
         dict_list.append(yaml_dict)
-        # TODO: Create 'place_pose' for the object
-
-        # TODO: Assign the arm to be used for pick_place
-
-        # TODO: Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
 
         # Wait for 'pick_place_routine' service to come up
         rospy.wait_for_service('pick_place_routine')
@@ -266,7 +255,7 @@ def pr2_mover(object_list):
             print "Service call failed: %s"%e
 
     # TODO: Output your request parameters into output yaml file
-    send_to_yaml('pick_list_1.yaml', dict_list)
+    send_to_yaml('output_list_3.yaml', dict_list)
 
 
 if __name__ == '__main__':
